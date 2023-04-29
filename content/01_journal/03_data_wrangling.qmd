@@ -1,8 +1,88 @@
 ---
 title: "Data Wrangling"
-author: "Joschka Schwarz"
+author: "Jamila Rzaayeva"
 ---
 
-::: callout-note
-You can delete everything in here and start fresh.
-:::
+```{r}
+library(tidyverse)
+library(vroom)
+library(data.table)
+
+col_types <- list(
+  id = col_character(),
+  type = col_character(),
+  number = col_character(),
+  country = col_character(),
+  date = col_date("%Y-%m-%d"),
+  abstract = col_character(),
+  title = col_character(),
+  kind = col_character(),
+  num_claims = col_double(),
+  filename = col_character(),
+  withdrawn = col_double()
+)
+
+
+patent_tb1 <- vroom(
+  file       = '../../Patent_data_reduced/patent.tsv', 
+  delim      = "\t", 
+  col_types  = col_types,
+  na         = c("", "NA", "NULL")
+)
+assignee_tb1 <- vroom(
+  file       = '../../Patent_data_reduced/assignee.tsv', 
+  delim      = "\t", 
+  col_types  = col_types,
+  na         = c("", "NA", "NULL")
+)
+patent_assignee_tb1 <- vroom(
+  file       = '../../Patent_data_reduced/patent_assignee.tsv', 
+  delim      = "\t", 
+  col_types  = col_types,
+  na         = c("", "NA", "NULL"))
+uspc_tb1 <- vroom(
+  file       = '../../Patent_data_reduced/uspc.tsv', 
+  delim      = "\t", 
+  col_types  = col_types,
+  na         = c("", "NA", "NULL")) %>%
+  transform(patent_id = as.character(patent_id))
+
+wrangled <- assignee_tb1 %>%
+  left_join(patent_assignee_tb1, by = c("id" = "assignee_id")) %>%
+  left_join(patent_tb1, by = c("patent_id" = "id")) %>%
+  left_join(uspc_tb1, by = "patent_id")
+
+patent_leaders <- sort(table(wrangled$organization), decreasing=T)[1:10] %>%
+  as.data.frame() %>%
+  mutate(Var1 = Var1 %>% str_to_title())
+
+data.table(
+  "Org" = patent_leaders$Var1,
+  "Patents" = patent_leaders$Freq)
+
+wrangled_august <- wrangled %>% 
+  select(organization, date) %>%
+  filter(date >= "2014-08-01" & date <= "2014-08-31")
+
+patent_leaders_august <- sort(table(wrangled_august$organization), decreasing=T)[1:10] %>%
+  as.data.frame() %>%
+  mutate(Var1 = Var1 %>% str_to_title())
+
+data.table(
+  "Org" = patent_leaders_august$Var1,
+  "Patents" = patent_leaders_august$Freq)
+
+wrangled_class <- wrangled %>%
+  select(organization, mainclass_id) %>%
+  filter(organization %in% patent_leaders$Var1[1:10]) %>% 
+  subset(mainclass_id != "No longer published")
+
+class_leaders <- sort(table(wrangled_class$mainclass_id), decreasing=T)[1:5] %>% 
+  as.data.frame() %>%
+  mutate(Var1 = Var1 %>% str_to_title())
+
+data.table(
+  "Main class" = class_leaders$Var1,
+  "Patents" = class_leaders$Freq)
+```
+
